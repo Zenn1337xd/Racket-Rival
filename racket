@@ -1,7 +1,7 @@
 -- =======================================================
--- Racket Rival Hub By kevan (v3 - Master Edition)
+-- Racket Rival Hub By kevan (v5 - Auto-Spin & Pity Edition)
 -- Owned by kevan#9999
--- Aggressive Aimbot/Auto-Punch + Racket Unlocker + FE Invisibility
+-- Auto-Spin 150 Yen + Adjustable Aimbot + Auto-Follow + Full Suite
 -- =======================================================
 
 local Players = game:GetService("Players")
@@ -38,10 +38,10 @@ local function notify(title, text)
     end)
 end
 
-notify("Racket Rival Hub", "Loaded Master Edition By kevan!")
+notify("Racket Rival Hub", "v5 Loaded | Auto-Spin & Pity Engine Ready!")
 
 -- =======================================================
--- THEME PALETTE
+-- CONFIGURATION & THEME
 -- =======================================================
 local THEME = {
     Bg        = Color3.fromRGB(15, 16, 22),
@@ -49,11 +49,113 @@ local THEME = {
     Card      = Color3.fromRGB(26, 28, 38),
     Accent    = Color3.fromRGB(235, 45, 55),
     BallNeon  = Color3.fromRGB(0, 255, 200),
+    DivineGold= Color3.fromRGB(255, 215, 0),
     Text      = Color3.fromRGB(245, 245, 250),
     SubText   = Color3.fromRGB(150, 155, 170),
     ToggleOff = Color3.fromRGB(38, 41, 54),
     ToggleOn  = Color3.fromRGB(235, 45, 55)
 }
+
+-- Adjustable Aimbot Variables
+local hitDistance = 18
+local rushSpeed = 42
+local aimbotPunchEnabled = false
+local autoFollowEnabled = false
+local isPunching = false
+
+-- Auto-Spin Variables
+local autoSpinEnabled = false
+local isSpinning = false
+
+-- =======================================================
+-- AUTO-SPIN & FAST PITY PIPELINE (150 YEN ROLLS)
+-- =======================================================
+local function fireSpinPurchase()
+    local spun = false
+
+    -- 1. Scan for game remotes controlling spins/crates
+    for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
+        if rem:IsA("RemoteEvent") or rem:IsA("RemoteFunction") then
+            local rName = string.lower(rem.Name)
+            if string.find(rName, "spin") or string.find(rName, "crate") or string.find(rName, "pack") 
+               or string.find(rName, "roll") or string.find(rName, "purchasepack") then
+                pcall(function()
+                    if rem:IsA("RemoteEvent") then
+                        rem:FireServer(1)
+                        rem:FireServer("1")
+                        rem:FireServer(150)
+                    else
+                        rem:InvokeServer(1)
+                    end
+                    spun = true
+                end)
+            end
+        end
+    end
+
+    -- 2. Fallback: Trigger GUI purchase buttons
+    pcall(function()
+        local pGui = player:FindFirstChild("PlayerGui")
+        if pGui then
+            for _, btn in ipairs(pGui:GetDescendants()) do
+                if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
+                    local text = btn:IsA("TextButton") and string.lower(btn.Text) or ""
+                    local bName = string.lower(btn.Name)
+                    if string.find(text, "150") or string.find(bName, "spin") or string.find(bName, "buy") or string.find(text, "spin") then
+                        if firesignal then
+                            firesignal(btn.Activated)
+                            firesignal(btn.MouseButton1Click)
+                        elseif getconnections then
+                            for _, conn in ipairs(getconnections(btn.Activated)) do conn:Fire() end
+                            for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
+                        end
+                        spun = true
+                    end
+                end
+            end
+        end
+    end)
+
+    return spun
+end
+
+-- Check if player inventory currently has a Divine pulled
+local function checkHasTargetDivine()
+    local targetNames = {"kitty", "neon chaos", "scraplung", "divine spin"}
+    for _, loc in ipairs({player.Backpack, character}) do
+        for _, item in ipairs(loc:GetChildren()) do
+            local itemName = string.lower(item.Name)
+            for _, target in ipairs(targetNames) do
+                if string.find(itemName, target) then
+                    return true, item.Name
+                end
+            end
+        end
+    end
+    return false, nil
+end
+
+-- Auto-Spin Loop
+task.spawn(function()
+    while true do
+        if autoSpinEnabled and not isSpinning then
+            isSpinning = true
+
+            local hasDivine, divineName = checkHasTargetDivine()
+            if hasDivine then
+                autoSpinEnabled = false
+                notify("Divine Obtained!", "Pulled " .. tostring(divineName) .. "! Auto-Spin stopped.")
+                isSpinning = false
+                break
+            end
+
+            fireSpinPurchase()
+            task.wait(0.25) -- Fast spin interval
+            isSpinning = false
+        end
+        task.wait(0.3)
+    end
+end)
 
 -- =======================================================
 -- SHUTTLECOCK / BADMINTON TRACKER
@@ -76,10 +178,9 @@ local function getActiveShuttle()
         end
     end
 
-    -- Physics velocity fallback
     for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("BasePart") and not obj.Anchored and obj.AssemblyLinearVelocity.Magnitude > 8 then
-            if obj.Size.Magnitude < 8 and not Players:GetPlayerFromCharacter(obj.Parent) then
+        if obj:IsA("BasePart") and not obj.Anchored and obj.AssemblyLinearVelocity.Magnitude > 6 then
+            if obj.Size.Magnitude < 7 and not Players:GetPlayerFromCharacter(obj.Parent) then
                 return obj
             end
         end
@@ -112,21 +213,14 @@ local function getEnemyCourtPosition()
 end
 
 -- =======================================================
--- AGGRESSIVE AIMBOT & AUTO-PUNCH PIPELINE
+-- SWING ENGINE
 -- =======================================================
-local aimbotPunchEnabled = false
-local autoFollowEnabled = false
-local rushSpeed = 42
-local isPunching = false
-
-local function executeAggressivePunch(shuttlePart, enemyPos)
+local function executePunch(shuttlePart, enemyPos)
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root or not shuttlePart then return end
 
-    -- 1. Hard Aim lock towards opponent
     root.CFrame = CFrame.new(root.Position, Vector3.new(enemyPos.X, root.Position.Y, enemyPos.Z))
 
-    -- 2. Physical Hitbox Touch Injection
     local racket = character:FindFirstChildWhichIsA("Tool") or character:FindFirstChild("Racket")
     local hitPart = (racket and racket:FindFirstChildWhichIsA("BasePart")) or root
     if firetouchinterest then
@@ -137,12 +231,10 @@ local function executeAggressivePunch(shuttlePart, enemyPos)
         end)
     end
 
-    -- 3. Trigger equipped tool
     if racket and racket:IsA("Tool") then
         racket:Activate()
     end
 
-    -- 4. Screen Tap Simulation (Mobile Racket Hit Button)
     pcall(function()
         local vp = workspace.CurrentCamera.ViewportSize
         VirtualUser:Button1Down(Vector2.new(vp.X * 0.85, vp.Y * 0.70), workspace.CurrentCamera.CFrame)
@@ -150,7 +242,6 @@ local function executeAggressivePunch(shuttlePart, enemyPos)
         VirtualUser:Button1Up(Vector2.new(vp.X * 0.85, vp.Y * 0.70), workspace.CurrentCamera.CFrame)
     end)
 
-    -- 5. Trigger all registered mobile buttons in PlayerGui
     pcall(function()
         local pGui = player:FindFirstChild("PlayerGui")
         if pGui then
@@ -173,7 +264,6 @@ local function executeAggressivePunch(shuttlePart, enemyPos)
         end
     end)
 
-    -- 6. Remote Invocation
     pcall(function()
         for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
             if rem:IsA("RemoteEvent") then
@@ -186,7 +276,6 @@ local function executeAggressivePunch(shuttlePart, enemyPos)
     end)
 end
 
--- Aimbot & Follow Loop
 RunService.Heartbeat:Connect(function()
     if not (aimbotPunchEnabled or autoFollowEnabled) then return end
 
@@ -199,24 +288,20 @@ RunService.Heartbeat:Connect(function()
         local flatDist = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(shuttle.Position.X, 0, shuttle.Position.Z)).Magnitude
         local totalDist = (root.Position - shuttle.Position).Magnitude
 
-        -- Follow ball trajectory
         if autoFollowEnabled and flatDist > 3.5 then
             hum.WalkSpeed = rushSpeed
             hum:MoveTo(Vector3.new(shuttle.Position.X, root.Position.Y, shuttle.Position.Z))
         end
 
-        -- Auto-Punch when shuttle enters hitting range
-        if aimbotPunchEnabled and totalDist <= 18 and not isPunching then
+        if aimbotPunchEnabled and totalDist <= hitDistance and not isPunching then
             isPunching = true
-
             local enemyPos = getEnemyCourtPosition()
 
-            -- Auto-Jump on high lobs
             if shuttle.Position.Y > (root.Position.Y + 4) then
                 hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
 
-            executeAggressivePunch(shuttle, enemyPos)
+            executePunch(shuttle, enemyPos)
             task.wait(0.2)
             isPunching = false
         end
@@ -228,23 +313,18 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- =======================================================
--- UNLOCK ALL RACKETS (STORE & INVENTORY SPONSOR)
+-- UNLOCK ALL RACKETS & INVISIBILITY
 -- =======================================================
 local function unlockAllRackets()
-    local unlockedCount = 0
-
-    -- 1. Scan ReplicatedStorage / Assets for Racket storage
     for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("Tool") and (string.find(string.lower(obj.Name), "racket") or string.find(string.lower(obj.Parent.Name), "racket")) then
             if not player.Backpack:FindFirstChild(obj.Name) and not character:FindFirstChild(obj.Name) then
                 local clone = obj:Clone()
                 clone.Parent = player.Backpack
-                unlockedCount = unlockedCount + 1
             end
         end
     end
 
-    -- 2. Probe equip and inventory remotes
     pcall(function()
         for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
             if rem:IsA("RemoteEvent") or rem:IsA("RemoteFunction") then
@@ -263,12 +343,9 @@ local function unlockAllRackets()
         end
     end)
 
-    notify("Rackets", "All available rackets loaded into inventory!")
+    notify("Rackets", "All rackets unlocked in Backpack!")
 end
 
--- =======================================================
--- REAL FE INVISIBILITY (DESYNC GHOST ENGINE)
--- =======================================================
 local isInvisible = false
 local invisConn = nil
 
@@ -278,7 +355,6 @@ local function toggleInvisibility(state)
     if not root then return end
 
     if state then
-        -- Desync local character representation from server camera/collider
         pcall(function()
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -292,13 +368,11 @@ local function toggleInvisibility(state)
             local rootJoint = lowerTorso and lowerTorso:FindFirstChild("Root")
             if rootJoint then
                 rootJoint.C0 = CFrame.new(0, 100000, 0)
-            else
-                root.CFrame = root.CFrame * CFrame.new(0, 0.05, 0)
             end
         end)
 
         invisConn = RunService.RenderStepped:Connect(function()
-            if character and character:FindFirstChildWhichIsA("Humanoid") then
+            if character then
                 for _, part in ipairs(character:GetDescendants()) do
                     if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
                         part.Transparency = 1
@@ -306,7 +380,7 @@ local function toggleInvisibility(state)
                 end
             end
         end)
-        notify("Invisibility", "True Invisibility Activated (Desynced)!")
+        notify("Invisibility", "True Invisibility Active!")
     else
         if invisConn then
             invisConn:Disconnect()
@@ -471,8 +545,8 @@ kStroke.Thickness = 2.2
 
 -- Main Window
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 390)
-mainFrame.Position = UDim2.new(0.5, -180, 0.35, -195)
+mainFrame.Size = UDim2.new(0, 370, 0, 440)
+mainFrame.Position = UDim2.new(0.5, -185, 0.30, -220)
 mainFrame.BackgroundColor3 = THEME.Bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -537,7 +611,7 @@ scrollList.Position = UDim2.new(0, 8, 0, 38)
 scrollList.BackgroundTransparency = 1
 scrollList.ScrollBarThickness = 2
 scrollList.ScrollBarImageColor3 = THEME.Accent
-scrollList.CanvasSize = UDim2.new(0, 0, 0, 380)
+scrollList.CanvasSize = UDim2.new(0, 0, 0, 580)
 scrollList.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout", scrollList)
@@ -601,30 +675,149 @@ local function makeToggle(labelText, defaultState, callback, icon)
     return card
 end
 
+-- Slider Constructor
+local function makeSliderCard(titlePrefix, currentVal, minVal, maxVal, unit, presets, onUpdate)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(0.96, 0, 0, 68)
+    card.BackgroundColor3 = THEME.Card
+    card.Parent = scrollList
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -16, 0, 18)
+    title.Position = UDim2.new(0, 8, 0, 4)
+    title.BackgroundTransparency = 1
+    title.Text = string.format("%s: %d %s", titlePrefix, currentVal, unit)
+    title.TextColor3 = THEME.Accent
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 11
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.Parent = card
+
+    local track = Instance.new("TextButton")
+    track.Size = UDim2.new(0.94, 0, 0, 6)
+    track.Position = UDim2.new(0.03, 0, 0, 26)
+    track.BackgroundColor3 = THEME.ToggleOff
+    track.Text = ""
+    track.AutoButtonColor = false
+    track.Parent = card
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
+
+    local fill = Instance.new("Frame")
+    local initRatio = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
+    fill.Size = UDim2.new(initRatio, 0, 1, 0)
+    fill.BackgroundColor3 = THEME.Accent
+    fill.BorderSizePixel = 0
+    fill.Parent = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
+
+    local function applyValue(val)
+        currentVal = math.clamp(math.floor(val), minVal, maxVal)
+        local ratio = (currentVal - minVal) / (maxVal - minVal)
+        fill.Size = UDim2.new(ratio, 0, 1, 0)
+        title.Text = string.format("%s: %d %s", titlePrefix, currentVal, unit)
+        onUpdate(currentVal)
+    end
+
+    local dragging = false
+    track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            local rel = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            applyValue(minVal + (rel * (maxVal - minVal)))
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            local rel = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+            applyValue(minVal + (rel * (maxVal - minVal)))
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+
+    local pRow = Instance.new("Frame")
+    pRow.Size = UDim2.new(0.94, 0, 0, 22)
+    pRow.Position = UDim2.new(0.03, 0, 0, 38)
+    pRow.BackgroundTransparency = 1
+    pRow.Parent = card
+
+    local count = #presets
+    for i, pVal in ipairs(presets) do
+        local pBtn = Instance.new("TextButton")
+        pBtn.Size = UDim2.new((1 / count) - 0.02, 0, 1, 0)
+        pBtn.Position = UDim2.new((i - 1) * (1 / count) + 0.01, 0, 0, 0)
+        pBtn.BackgroundColor3 = Color3.fromRGB(34, 37, 48)
+        pBtn.Text = tostring(pVal)
+        pBtn.TextColor3 = THEME.SubText
+        pBtn.Font = Enum.Font.GothamBold
+        pBtn.TextSize = 10
+        pBtn.Parent = pRow
+        Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 4)
+        pBtn.MouseButton1Click:Connect(function()
+            applyValue(pVal)
+        end)
+    end
+end
+
 -- =======================================================
--- ADD FEATURE BUTTONS & TOGGLES
+-- ADD FEATURE CONTROLS
 -- =======================================================
 
--- 1. Aggressive Aimbot (Auto-Punch to Enemy)
+-- 1. Auto-Spin & Fast Pity Engine (Target: Divine, Kitty, Neon Chaos)
+makeToggle("Auto-Spin 150 Yen (Fast Roll until Divine)", false, function(on)
+    autoSpinEnabled = on
+    if on then
+        notify("Spin Engine", "Fast rolling 150 Yen! Auto-stops at Divine/Pity.")
+    else
+        notify("Spin Engine", "Auto-Spin stopped.")
+    end
+end, "🎰")
+
+local singleSpinBtn = Instance.new("TextButton")
+singleSpinBtn.Size = UDim2.new(0.96, 0, 0, 36)
+singleSpinBtn.BackgroundColor3 = THEME.DivineGold
+singleSpinBtn.Text = "⚡ Instant Spin 150 Yen (Skip Animation)"
+singleSpinBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
+singleSpinBtn.Font = Enum.Font.GothamBold
+singleSpinBtn.TextSize = 11
+singleSpinBtn.Parent = scrollList
+Instance.new("UICorner", singleSpinBtn).CornerRadius = UDim.new(0, 6)
+singleSpinBtn.MouseButton1Click:Connect(function()
+    fireSpinPurchase()
+    notify("Fast Spin", "Purchased 1x 150 Yen pack instantly!")
+end)
+
+-- 2. Sliders for Hit Distance and Rush Speed
+makeSliderCard("Hit Distance (Strike Range)", hitDistance, 8, 35, "studs", {12, 18, 25, 32}, function(val)
+    hitDistance = val
+end)
+
+makeSliderCard("Auto-Follow Speed (Rush Speed)", rushSpeed, 16, 85, "speed", {25, 42, 60, 80}, function(val)
+    rushSpeed = val
+end)
+
+-- 3. Aimbot & Follow Toggles
 makeToggle("Aimbot (Auto Punch to Enemy)", false, function(on)
     aimbotPunchEnabled = on
     notify("Aimbot", on and "Auto-Punch Activated!" or "Aimbot Disabled")
 end, "🏓")
 
--- 2. Auto-Follow Badminton
 makeToggle("Auto-Follow Badminton (Tracks Ball Path)", false, function(on)
     autoFollowEnabled = on
     notify("Follow", on and "Tracking ball landing path!" or "Follow Off")
 end, "🏃")
 
--- 3. Invisibility On/Off (Real Server Desync)
+-- 4. Invisibility & Racket Unlocker
 makeToggle("Invisibility (Ghost / No One Sees You)", false, function(on)
     toggleInvisibility(on)
 end, "👻")
 
--- 4. Unlock All Rackets Button
 local unlockBtn = Instance.new("TextButton")
-unlockBtn.Size = UDim2.new(0.96, 0, 0, 38)
+unlockBtn.Size = UDim2.new(0.96, 0, 0, 36)
 unlockBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 220)
 unlockBtn.Text = "🔓 Unlock All Rackets (Store & Items)"
 unlockBtn.TextColor3 = THEME.Text
@@ -634,25 +827,23 @@ unlockBtn.Parent = scrollList
 Instance.new("UICorner", unlockBtn).CornerRadius = UDim.new(0, 6)
 unlockBtn.MouseButton1Click:Connect(unlockAllRackets)
 
--- 5. Jump High 5x
+-- 5. Movement Multipliers
 makeToggle("Jump High 5x (Smash Counter)", false, function(on)
     jumpHighEnabled = on
     updateJumpStats()
     notify("Jump", on and "5x Jump Height Active!" or "Jump reset")
 end, "⚡")
 
--- 6. Infinite Jump
 makeToggle("Infinite Jump (Air Counter)", false, function(on)
     setInfJump(on)
 end, "🦘")
 
--- 7. Scan Badminton (Color ESP)
+-- 6. Badminton Scanner & Optimizer
 makeToggle("Scan Badminton (Highlight Caught Only)", true, function(on)
     scanEnabled = on
     notify("ESP", on and "Color ESP Active for Birdie!" or "Scanner Off")
 end, "🏸")
 
--- 8. FPS Booster
 local optBtn = Instance.new("TextButton")
 optBtn.Size = UDim2.new(0.96, 0, 0, 36)
 optBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 180)
