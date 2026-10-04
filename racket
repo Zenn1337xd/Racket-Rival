@@ -1,14 +1,14 @@
 -- =======================================================
--- Racket Rival Hub By kevan
+-- Racket Rival Hub By kevan (v2 - True Follow & Auto-Punch)
 -- Owned by kevan#9999
--- Auto Play + Speed Rush + Aimbot + Badminton Color ESP
+-- Auto Follow Badminton + Auto Punch + Aimbot + Color ESP
 -- =======================================================
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
@@ -19,7 +19,7 @@ player.CharacterAdded:Connect(function(char)
     character = char
 end)
 
--- Safe UI Container
+-- Safe UI Placement
 local targetParent = nil
 pcall(function() targetParent = CoreGui end)
 if not targetParent then targetParent = player:WaitForChild("PlayerGui") end
@@ -38,10 +38,10 @@ local function notify(title, text)
     end)
 end
 
-notify("Racket Rival Hub", "Loaded | Auto Play & Speed Rush Ready!")
+notify("Racket Rival Hub", "Auto-Follow & Auto-Punch Loaded!")
 
 -- =======================================================
--- PALETTE & CONFIG
+-- THEME CONFIGURATION
 -- =======================================================
 local THEME = {
     Bg       = Color3.fromRGB(15, 16, 22),
@@ -56,10 +56,10 @@ local THEME = {
 }
 
 -- =======================================================
--- SHUTTLECOCK / BADMINTON TRACKER
+-- ENHANCED SHUTTLECOCK DETECTOR
 -- =======================================================
 local function getActiveShuttle()
-    -- 1. Direct workspace names
+    -- 1. Scan primary projectile names
     for _, name in ipairs({"Shuttle", "Shuttlecock", "Birdie", "Badminton", "Ball"}) do
         local direct = workspace:FindFirstChild(name, true)
         if direct and direct:IsA("BasePart") and not direct:IsDescendantOf(character) then
@@ -67,12 +67,21 @@ local function getActiveShuttle()
         end
     end
 
-    -- 2. Scan workspace descendants
+    -- 2. Search by model and naming patterns
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
             local lName = string.lower(obj.Name)
-            if (string.find(lName, "shuttle") or string.find(lName, "birdie") or string.find(lName, "badminton")) 
-               and not string.find(lName, "spawner") and not string.find(lName, "gui") then
+            if (string.find(lName, "shuttle") or string.find(lName, "birdie") or string.find(lName, "badminton"))
+               and not string.find(lName, "gui") and not string.find(lName, "spawner") and not string.find(lName, "net") then
+                return obj
+            end
+        end
+    end
+
+    -- 3. Dynamic physics search (moving unanchored projectile)
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if obj:IsA("BasePart") and not obj.Anchored and obj.AssemblyLinearVelocity.Magnitude > 6 then
+            if obj.Size.Magnitude < 6 and not Players:GetPlayerFromCharacter(obj.Parent) then
                 return obj
             end
         end
@@ -80,8 +89,8 @@ local function getActiveShuttle()
     return nil
 end
 
--- Locate Opponent Court
-local function getEnemyPosition()
+-- Locate Opponent / Enemy Court
+local function getEnemyTargetPos()
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return Vector3.zero end
 
@@ -100,71 +109,90 @@ local function getEnemyPosition()
     end
 
     if not targetPos then
-        targetPos = root.Position + (root.CFrame.LookVector * 50)
+        targetPos = root.Position + (root.CFrame.LookVector * 60)
     end
     return targetPos
 end
 
 -- =======================================================
--- AUTO PLAY & SWING ENGINE
+-- MULTI-ACTION SWING / PUNCH ENGINE
 -- =======================================================
-local autoPlayEnabled = false
-local speedRushEnabled = true
-local rushSpeedValue = 38
-local hitCooldown = false
+local isPunching = false
 
-local function executeRacketSwing(targetPos)
-    -- Turn character to face enemy court
+local function performPunch(enemyPos)
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if root and targetPos then
-        root.CFrame = CFrame.new(root.Position, Vector3.new(targetPos.X, root.Position.Y, targetPos.Z))
+    if not root then return end
+
+    -- 1. Aim directly towards opponent's court
+    if enemyPos then
+        root.CFrame = CFrame.new(root.Position, Vector3.new(enemyPos.X, root.Position.Y, enemyPos.Z))
     end
 
-    -- Method A: Trigger mobile swing UI button directly
+    -- 2. Trigger equipped racket tool
+    local tool = character:FindFirstChildWhichIsA("Tool")
+    if tool then
+        tool:Activate()
+    end
+
+    -- 3. Trigger Game Mobile Swing Buttons (Right Side of Screen)
     pcall(function()
         local pGui = player:FindFirstChild("PlayerGui")
         if pGui then
+            local screenWidth = workspace.CurrentCamera.ViewportSize.X
             for _, btn in ipairs(pGui:GetDescendants()) do
                 if (btn:IsA("ImageButton") or btn:IsA("TextButton")) and btn.Visible then
-                    local bName = string.lower(btn.Name)
-                    if string.find(bName, "hit") or string.find(bName, "swing") or string.find(bName, "smash") or string.find(bName, "strike") then
-                        for _, conn in ipairs(getconnections(btn.Activated)) do conn:Fire() end
-                        for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
-                        for _, conn in ipairs(getconnections(btn.MouseButton1Down)) do conn:Fire() end
+                    if btn.AbsolutePosition.X > (screenWidth * 0.45) then
+                        local bName = string.lower(btn.Name)
+                        local img = string.lower(btn:IsA("ImageButton") and btn.Image or "")
+                        if string.find(bName, "hit") or string.find(bName, "swing") or string.find(bName, "shuttle")
+                           or string.find(bName, "smash") or string.find(img, "shuttle") or string.find(bName, "action") then
+                            if firesignal then
+                                firesignal(btn.Activated)
+                                firesignal(btn.MouseButton1Click)
+                                firesignal(btn.MouseButton1Down)
+                            elseif getconnections then
+                                for _, conn in ipairs(getconnections(btn.Activated)) do conn:Fire() end
+                                for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
+                            end
+                        end
                     end
                 end
             end
         end
     end)
 
-    -- Method B: Virtual Input Event
+    -- 4. Screen Tap Simulation (Mobile Swing Area)
     pcall(function()
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-        task.wait(0.04)
-        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-    end)
-    pcall(function()
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game)
-        task.wait(0.04)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.F, false, game)
+        local camSize = workspace.CurrentCamera.ViewportSize
+        local tapX = camSize.X * 0.85
+        local tapY = camSize.Y * 0.70
+        VirtualUser:Button1Down(Vector2.new(tapX, tapY), workspace.CurrentCamera.CFrame)
+        task.wait(0.03)
+        VirtualUser:Button1Up(Vector2.new(tapX, tapY), workspace.CurrentCamera.CFrame)
     end)
 
-    -- Method C: Network Remotes
+    -- 5. Fire Game Network Remotes
     pcall(function()
         for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
             if r:IsA("RemoteEvent") then
                 local rName = string.lower(r.Name)
-                if string.find(rName, "hit") or string.find(rName, "swing") or string.find(rName, "smash") then
-                    r:FireServer(targetPos)
+                if string.find(rName, "hit") or string.find(rName, "swing") or string.find(rName, "smash") or string.find(rName, "play") then
+                    r:FireServer(enemyPos)
                 end
             end
         end
     end)
 end
 
--- Auto Play & Speed Rush Heartbeat Loop
+-- =======================================================
+-- AUTO-FOLLOW & AUTO-PUNCH CONTROLLER
+-- =======================================================
+local autoPunchEnabled = false
+local autoFollowEnabled = false
+local rushSpeedValue = 38
+
 RunService.Heartbeat:Connect(function()
-    if not autoPlayEnabled then return end
+    if not (autoPunchEnabled or autoFollowEnabled) then return end
 
     local root = character and character:FindFirstChild("HumanoidRootPart")
     local hum = character and character:FindFirstChildWhichIsA("Humanoid")
@@ -175,28 +203,26 @@ RunService.Heartbeat:Connect(function()
         local flatDistance = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(shuttle.Position.X, 0, shuttle.Position.Z)).Magnitude
         local totalDistance = (root.Position - shuttle.Position).Magnitude
 
-        -- Speed Rush: Sprint directly to the ball's position
-        if flatDistance > 5 then
-            if speedRushEnabled then
-                hum.WalkSpeed = rushSpeedValue
-            end
+        -- Follow / Rush towards badminton position
+        if autoFollowEnabled and flatDistance > 3.5 then
+            hum.WalkSpeed = rushSpeedValue
             hum:MoveTo(Vector3.new(shuttle.Position.X, root.Position.Y, shuttle.Position.Z))
         end
 
-        -- In Strike Range: Auto-Aim and Punch/Swing toward opponent
-        if totalDistance <= 16 and not hitCooldown then
-            hitCooldown = true
+        -- Auto-Punch when badminton enters striking zone
+        if autoPunchEnabled and totalDistance <= 16 and not isPunching then
+            isPunching = true
 
-            local enemyPos = getEnemyPosition()
+            local enemyPos = getEnemyTargetPos()
 
-            -- High lob jump counter
-            if shuttle.Position.Y > (root.Position.Y + 5) then
+            -- High Lob Aerial Jump Counter
+            if shuttle.Position.Y > (root.Position.Y + 4) then
                 hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
 
-            executeRacketSwing(enemyPos)
-            task.wait(0.2)
-            hitCooldown = false
+            performPunch(enemyPos)
+            task.wait(0.22)
+            isPunching = false
         end
     else
         if hum.WalkSpeed == rushSpeedValue then
@@ -279,7 +305,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =======================================================
--- JUMP 5X & COUNTER MOVEMENT
+-- JUMP 5X & MOVEMENT STATS
 -- =======================================================
 local jumpHighEnabled = false
 local infJumpEnabled = false
@@ -344,8 +370,8 @@ kStroke.Thickness = 2.2
 
 -- Main Window
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 340)
-mainFrame.Position = UDim2.new(0.5, -180, 0.35, -170)
+mainFrame.Size = UDim2.new(0, 360, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -180, 0.35, -175)
 mainFrame.BackgroundColor3 = THEME.Bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -410,7 +436,7 @@ scrollList.Position = UDim2.new(0, 8, 0, 38)
 scrollList.BackgroundTransparency = 1
 scrollList.ScrollBarThickness = 2
 scrollList.ScrollBarImageColor3 = THEME.Accent
-scrollList.CanvasSize = UDim2.new(0, 0, 0, 310)
+scrollList.CanvasSize = UDim2.new(0, 0, 0, 340)
 scrollList.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout", scrollList)
@@ -478,34 +504,34 @@ end
 -- ADD FEATURE TOGGLES
 -- =======================================================
 
--- 1. Aimbot & Auto Play (Auto Rush + Hit)
-makeToggle("Aimbot & Auto Play (Rush & Swing)", false, function(on)
-    autoPlayEnabled = on
-    notify("Auto Play", on and "Auto Play & Aimbot Active!" or "Auto Play Disabled")
+-- 1. Auto-Punch / Aimbot (Hits directly toward opponent)
+makeToggle("Auto-Punch / Aimbot (Strikes to Enemy)", false, function(on)
+    autoPunchEnabled = on
+    notify("Auto-Punch", on and "Auto-Punch Activated!" or "Auto-Punch Disabled")
 end, "🏓")
 
--- 2. Speed Rush Toggle
-makeToggle("Speed Rush to Shuttlecock", true, function(on)
-    speedRushEnabled = on
-    notify("Speed Rush", on and "Sprint Rush Active on Ball Approach!" or "Speed Rush Disabled")
-end, "⚡")
+-- 2. Auto-Follow Badminton (Runs directly under the ball)
+makeToggle("Auto-Follow Badminton (Tracks Ball Path)", false, function(on)
+    autoFollowEnabled = on
+    notify("Auto-Follow", on and "Character now tracks shuttlecock!" or "Follow Disabled")
+end, "🏃")
 
--- 3. Jump High 5x
-makeToggle("Jump High 5x (Smash Counter)", false, function(on)
+-- 3. Jump High 5x (Smash Counter)
+makeToggle("Jump High 5x (Aerial Counter)", false, function(on)
     jumpHighEnabled = on
     updateJumpStats()
-    notify("Jump High", on and "5x Jump Enabled!" or "Reset to normal")
-end, "🦘")
+    notify("Jump High", on and "5x Jump Height Active!" or "Jump reset to normal")
+end, "⚡")
 
 -- 4. Infinite Jump
-makeToggle("Infinite Jump (Aerial Hang)", false, function(on)
+makeToggle("Infinite Jump (Air Hang)", false, function(on)
     setInfJump(on)
-end, "☁️")
+end, "🦘")
 
 -- 5. Scan Badminton ESP
 makeToggle("Scan Badminton (Color ESP)", true, function(on)
     scanEnabled = on
-    notify("Badminton Scanner", on and "Color ESP Active for Birdie!" or "Scanner Off")
+    notify("ESP", on and "Color ESP Active!" or "ESP Off")
 end, "🏸")
 
 -- 6. FPS Optimizer
