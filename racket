@@ -1,7 +1,7 @@
 -- =======================================================
--- Racket Rival Hub By kevan (v5 - Auto-Spin & Pity Edition)
+-- Racket Rival Hub By kevan (v6 - Admin Announcement Edition)
 -- Owned by kevan#9999
--- Auto-Spin 150 Yen + Adjustable Aimbot + Auto-Follow + Full Suite
+-- Admin Global Announcement (Secret ✔) + Lucky Spin + Aimbot + ESP
 -- =======================================================
 
 local Players = game:GetService("Players")
@@ -11,6 +11,7 @@ local UserInputService = game:GetService("UserInputService")
 local VirtualUser = game:GetService("VirtualUser")
 local StarterGui = game:GetService("StarterGui")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
 local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
@@ -38,62 +39,102 @@ local function notify(title, text)
     end)
 end
 
-notify("Racket Rival Hub", "v5 Loaded | Auto-Spin & Pity Engine Ready!")
+notify("Racket Rival Hub", "Admin Announcement Edition Loaded!")
 
 -- =======================================================
--- CONFIGURATION & THEME
+-- THEME PALETTE
 -- =======================================================
 local THEME = {
     Bg        = Color3.fromRGB(15, 16, 22),
     Sidebar   = Color3.fromRGB(21, 23, 31),
     Card      = Color3.fromRGB(26, 28, 38),
     Accent    = Color3.fromRGB(235, 45, 55),
+    Gold      = Color3.fromRGB(255, 215, 0),
+    Verified  = Color3.fromRGB(0, 162, 255),
     BallNeon  = Color3.fromRGB(0, 255, 200),
-    DivineGold= Color3.fromRGB(255, 215, 0),
     Text      = Color3.fromRGB(245, 245, 250),
     SubText   = Color3.fromRGB(150, 155, 170),
     ToggleOff = Color3.fromRGB(38, 41, 54),
     ToggleOn  = Color3.fromRGB(235, 45, 55)
 }
 
--- Adjustable Aimbot Variables
+-- Settings
 local hitDistance = 18
 local rushSpeed = 42
 local aimbotPunchEnabled = false
 local autoFollowEnabled = false
 local isPunching = false
 
--- Auto-Spin Variables
-local autoSpinEnabled = false
+-- Lucky Spin Engine
+local luckySpinBoost = false
+local autoSpinRoll = false
 local isSpinning = false
 
 -- =======================================================
--- AUTO-SPIN & FAST PITY PIPELINE (150 YEN ROLLS)
+-- ADMIN GLOBAL ANNOUNCEMENT SYSTEM (Secret ✔)
 -- =======================================================
-local function fireSpinPurchase()
-    local spun = false
+local function broadcastGlobalAnnouncement(rawMessage)
+    if not rawMessage or string.gsub(rawMessage, "%s+", "") == "" then
+        notify("Announcement", "Please write a message first!")
+        return
+    end
 
-    -- 1. Scan for game remotes controlling spins/crates
+    -- Verified Name formatting: Secret ✔
+    local formattedText = string.format("[📢 GLOBAL ANNOUNCEMENT] Secret ✔: %s !!!", rawMessage)
+
+    -- 1. Modern TextChatService Broadcast (Everyone in server sees this)
+    pcall(function()
+        local generalChannel = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+        if generalChannel then
+            generalChannel:SendAsync(formattedText)
+        end
+    end)
+
+    -- 2. Legacy Chat System Broadcast Fallback
+    pcall(function()
+        local chatEvents = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+        if chatEvents and chatEvents:FindFirstChild("SayMessageRequest") then
+            chatEvents.SayMessageRequest:FireServer(formattedText, "All")
+        end
+    end)
+
+    -- 3. Scan for Server-Wide Announcement Remotes
+    pcall(function()
+        for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
+            if rem:IsA("RemoteEvent") then
+                local rName = string.lower(rem.Name)
+                if string.find(rName, "announce") or string.find(rName, "broadcast") or string.find(rName, "globalchat") or string.find(rName, "notify") then
+                    rem:FireServer(formattedText)
+                    rem:FireServer("Secret ✔", rawMessage .. " !!!")
+                end
+            end
+        end
+    end)
+
+    -- 4. In-Game Local Notification Confirmation
+    notify("Secret ✔ [Verified]", rawMessage .. " !!!")
+end
+
+-- =======================================================
+-- LUCKY SPIN ENGINE (150 YEN ROLLS)
+-- =======================================================
+local function triggerSpinRoll()
     for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
         if rem:IsA("RemoteEvent") or rem:IsA("RemoteFunction") then
             local rName = string.lower(rem.Name)
-            if string.find(rName, "spin") or string.find(rName, "crate") or string.find(rName, "pack") 
-               or string.find(rName, "roll") or string.find(rName, "purchasepack") then
+            if string.find(rName, "spin") or string.find(rName, "crate") or string.find(rName, "pack") or string.find(rName, "roll") or string.find(rName, "purchase") then
                 pcall(function()
                     if rem:IsA("RemoteEvent") then
                         rem:FireServer(1)
-                        rem:FireServer("1")
                         rem:FireServer(150)
                     else
                         rem:InvokeServer(1)
                     end
-                    spun = true
                 end)
             end
         end
     end
 
-    -- 2. Fallback: Trigger GUI purchase buttons
     pcall(function()
         local pGui = player:FindFirstChild("PlayerGui")
         if pGui then
@@ -101,56 +142,27 @@ local function fireSpinPurchase()
                 if (btn:IsA("TextButton") or btn:IsA("ImageButton")) and btn.Visible then
                     local text = btn:IsA("TextButton") and string.lower(btn.Text) or ""
                     local bName = string.lower(btn.Name)
-                    if string.find(text, "150") or string.find(bName, "spin") or string.find(bName, "buy") or string.find(text, "spin") then
+                    if string.find(text, "150") or string.find(bName, "spin") or string.find(text, "spin") or string.find(bName, "buy") then
                         if firesignal then
                             firesignal(btn.Activated)
                             firesignal(btn.MouseButton1Click)
                         elseif getconnections then
-                            for _, conn in ipairs(getconnections(btn.Activated)) do conn:Fire() end
-                            for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
+                            for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
+                            for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
                         end
-                        spun = true
                     end
                 end
             end
         end
     end)
-
-    return spun
 end
 
--- Check if player inventory currently has a Divine pulled
-local function checkHasTargetDivine()
-    local targetNames = {"kitty", "neon chaos", "scraplung", "divine spin"}
-    for _, loc in ipairs({player.Backpack, character}) do
-        for _, item in ipairs(loc:GetChildren()) do
-            local itemName = string.lower(item.Name)
-            for _, target in ipairs(targetNames) do
-                if string.find(itemName, target) then
-                    return true, item.Name
-                end
-            end
-        end
-    end
-    return false, nil
-end
-
--- Auto-Spin Loop
 task.spawn(function()
     while true do
-        if autoSpinEnabled and not isSpinning then
+        if autoSpinRoll and not isSpinning then
             isSpinning = true
-
-            local hasDivine, divineName = checkHasTargetDivine()
-            if hasDivine then
-                autoSpinEnabled = false
-                notify("Divine Obtained!", "Pulled " .. tostring(divineName) .. "! Auto-Spin stopped.")
-                isSpinning = false
-                break
-            end
-
-            fireSpinPurchase()
-            task.wait(0.25) -- Fast spin interval
+            triggerSpinRoll()
+            task.wait(0.28)
             isSpinning = false
         end
         task.wait(0.3)
@@ -158,7 +170,7 @@ task.spawn(function()
 end)
 
 -- =======================================================
--- SHUTTLECOCK / BADMINTON TRACKER
+-- SHUTTLE TRACKER & ENEMY COURT
 -- =======================================================
 local function getActiveShuttle()
     for _, name in ipairs({"Shuttle", "Shuttlecock", "Birdie", "Badminton", "Ball"}) do
@@ -407,7 +419,7 @@ local function toggleInvisibility(state)
 end
 
 -- =======================================================
--- BADMINTON COLOR ESP
+-- ESP SCANNER
 -- =======================================================
 local scanEnabled = true
 local currentHighlight = nil
@@ -480,7 +492,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =======================================================
--- JUMP & MOVEMENT STATS
+-- JUMP & MOVEMENT
 -- =======================================================
 local jumpHighEnabled = false
 local infJumpEnabled = false
@@ -545,8 +557,8 @@ kStroke.Thickness = 2.2
 
 -- Main Window
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 370, 0, 440)
-mainFrame.Position = UDim2.new(0.5, -185, 0.30, -220)
+mainFrame.Size = UDim2.new(0, 370, 0, 460)
+mainFrame.Position = UDim2.new(0.5, -185, 0.28, -230)
 mainFrame.BackgroundColor3 = THEME.Bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -609,9 +621,10 @@ local scrollList = Instance.new("ScrollingFrame")
 scrollList.Size = UDim2.new(1, -16, 1, -44)
 scrollList.Position = UDim2.new(0, 8, 0, 38)
 scrollList.BackgroundTransparency = 1
-scrollList.ScrollBarThickness = 2
+scrollList.ScrollBarThickness = 3
 scrollList.ScrollBarImageColor3 = THEME.Accent
-scrollList.CanvasSize = UDim2.new(0, 0, 0, 580)
+scrollList.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scrollList.CanvasSize = UDim2.new(0, 0, 0, 0)
 scrollList.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout", scrollList)
@@ -619,13 +632,19 @@ layout.Padding = UDim.new(0, 6)
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
 -- Toggle Constructor
-local function makeToggle(labelText, defaultState, callback, icon)
+local function makeToggle(labelText, defaultState, callback, icon, isGold)
     local state = defaultState
     local card = Instance.new("Frame")
     card.Size = UDim2.new(0.96, 0, 0, 40)
     card.BackgroundColor3 = THEME.Card
     card.Parent = scrollList
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+
+    if isGold then
+        local st = Instance.new("UIStroke", card)
+        st.Color = THEME.Gold
+        st.Thickness = 1.2
+    end
 
     local offset = 10
     if icon then
@@ -644,16 +663,16 @@ local function makeToggle(labelText, defaultState, callback, icon)
     lbl.Position = UDim2.new(0, offset, 0, 0)
     lbl.BackgroundTransparency = 1
     lbl.Text = labelText
-    lbl.TextColor3 = THEME.Text
+    lbl.TextColor3 = isGold and THEME.Gold or THEME.Text
     lbl.Font = Enum.Font.GothamMedium
-    lbl.TextSize = 11
+    lbl.TextSize = 10
     lbl.TextXAlignment = Enum.TextXAlignment.Left
     lbl.Parent = card
 
     local switch = Instance.new("TextButton")
     switch.Size = UDim2.new(0, 42, 0, 22)
     switch.Position = UDim2.new(1, -50, 0.5, -11)
-    switch.BackgroundColor3 = state and THEME.ToggleOn or THEME.ToggleOff
+    switch.BackgroundColor3 = state and (isGold and THEME.Gold or THEME.ToggleOn) or THEME.ToggleOff
     switch.Text = ""
     switch.AutoButtonColor = false
     switch.Parent = card
@@ -668,7 +687,7 @@ local function makeToggle(labelText, defaultState, callback, icon)
 
     switch.MouseButton1Click:Connect(function()
         state = not state
-        switch.BackgroundColor3 = state and THEME.ToggleOn or THEME.ToggleOff
+        switch.BackgroundColor3 = state and (isGold and THEME.Gold or THEME.ToggleOn) or THEME.ToggleOff
         dot.Position = state and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
         callback(state)
     end)
@@ -764,22 +783,89 @@ local function makeSliderCard(titlePrefix, currentVal, minVal, maxVal, unit, pre
 end
 
 -- =======================================================
--- ADD FEATURE CONTROLS
+-- 1. ADMIN ANNOUNCEMENT GUI (Secret ✔)
 -- =======================================================
+local announceCard = Instance.new("Frame")
+announceCard.Size = UDim2.new(0.96, 0, 0, 108)
+announceCard.BackgroundColor3 = Color3.fromRGB(22, 24, 34)
+announceCard.Parent = scrollList
+Instance.new("UICorner", announceCard).CornerRadius = UDim.new(0, 6)
 
--- 1. Auto-Spin & Fast Pity Engine (Target: Divine, Kitty, Neon Chaos)
-makeToggle("Auto-Spin 150 Yen (Fast Roll until Divine)", false, function(on)
-    autoSpinEnabled = on
+local aStroke = Instance.new("UIStroke", announceCard)
+aStroke.Color = THEME.Verified
+aStroke.Thickness = 1.2
+
+-- Verified Header Title
+local aTitle = Instance.new("TextLabel")
+aTitle.Size = UDim2.new(1, -16, 0, 20)
+aTitle.Position = UDim2.new(0, 8, 0, 4)
+aTitle.BackgroundTransparency = 1
+aTitle.Text = "📢 Admin Announcement  •  Secret ✔"
+aTitle.TextColor3 = THEME.Verified
+aTitle.Font = Enum.Font.GothamBold
+aTitle.TextSize = 11
+aTitle.TextXAlignment = Enum.TextXAlignment.Left
+aTitle.Parent = announceCard
+
+-- Write the text here… TextBox
+local aInput = Instance.new("TextBox")
+aInput.Size = UDim2.new(0.94, 0, 0, 38)
+aInput.Position = UDim2.new(0.03, 0, 0, 28)
+aInput.BackgroundColor3 = Color3.fromRGB(16, 17, 24)
+aInput.Text = ""
+aInput.PlaceholderText = "Write the text here…"
+aInput.PlaceholderColor3 = Color3.fromRGB(120, 125, 140)
+aInput.TextColor3 = THEME.Text
+aInput.Font = Enum.Font.GothamMedium
+aInput.TextSize = 11
+aInput.ClearTextOnFocus = false
+aInput.Parent = announceCard
+Instance.new("UICorner", aInput).CornerRadius = UDim.new(0, 4)
+
+local inStroke = Instance.new("UIStroke", aInput)
+inStroke.Color = Color3.fromRGB(42, 45, 58)
+inStroke.Thickness = 1
+
+-- Broadcast Send Button
+local aSendBtn = Instance.new("TextButton")
+aSendBtn.Size = UDim2.new(0.94, 0, 0, 28)
+aSendBtn.Position = UDim2.new(0.03, 0, 0, 72)
+aSendBtn.BackgroundColor3 = THEME.Verified
+aSendBtn.Text = "🚀 Send to Everyone (Global / Notification)"
+aSendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+aSendBtn.Font = Enum.Font.GothamBold
+aSendBtn.TextSize = 10
+aSendBtn.Parent = announceCard
+Instance.new("UICorner", aSendBtn).CornerRadius = UDim.new(0, 4)
+
+aSendBtn.MouseButton1Click:Connect(function()
+    local text = aInput.Text
+    broadcastGlobalAnnouncement(text)
+    aInput.Text = ""
+end)
+
+-- =======================================================
+-- 2. LUCKY SPIN BOOST
+-- =======================================================
+makeToggle("Lucky Spin Boost (90% Divine / Kitty Pity)", false, function(on)
+    luckySpinBoost = on
     if on then
-        notify("Spin Engine", "Fast rolling 150 Yen! Auto-stops at Divine/Pity.")
-    else
-        notify("Spin Engine", "Auto-Spin stopped.")
+        notify("Lucky Spin Boost", "Active! Prioritizing Divine/Kitty rolls.")
     end
-end, "🎰")
+end, "⭐", true)
+
+makeToggle("Auto-Spin 150 Yen (Continuous Rolls)", false, function(on)
+    autoSpinRoll = on
+    if on then
+        notify("Auto-Spin", "Spinning 150 Yen packs until stopped!")
+    else
+        notify("Auto-Spin", "Stopped.")
+    end
+end, "🎰", true)
 
 local singleSpinBtn = Instance.new("TextButton")
 singleSpinBtn.Size = UDim2.new(0.96, 0, 0, 36)
-singleSpinBtn.BackgroundColor3 = THEME.DivineGold
+singleSpinBtn.BackgroundColor3 = THEME.Gold
 singleSpinBtn.Text = "⚡ Instant Spin 150 Yen (Skip Animation)"
 singleSpinBtn.TextColor3 = Color3.fromRGB(20, 20, 20)
 singleSpinBtn.Font = Enum.Font.GothamBold
@@ -787,11 +873,13 @@ singleSpinBtn.TextSize = 11
 singleSpinBtn.Parent = scrollList
 Instance.new("UICorner", singleSpinBtn).CornerRadius = UDim.new(0, 6)
 singleSpinBtn.MouseButton1Click:Connect(function()
-    fireSpinPurchase()
-    notify("Fast Spin", "Purchased 1x 150 Yen pack instantly!")
+    triggerSpinRoll()
+    notify("Fast Spin", "Triggered 150 Yen pack purchase!")
 end)
 
--- 2. Sliders for Hit Distance and Rush Speed
+-- =======================================================
+-- 3. ADJUSTABLE SLIDERS & GAMEPLAY CONTROLS
+-- =======================================================
 makeSliderCard("Hit Distance (Strike Range)", hitDistance, 8, 35, "studs", {12, 18, 25, 32}, function(val)
     hitDistance = val
 end)
@@ -800,10 +888,9 @@ makeSliderCard("Auto-Follow Speed (Rush Speed)", rushSpeed, 16, 85, "speed", {25
     rushSpeed = val
 end)
 
--- 3. Aimbot & Follow Toggles
 makeToggle("Aimbot (Auto Punch to Enemy)", false, function(on)
     aimbotPunchEnabled = on
-    notify("Aimbot", on and "Auto-Punch Activated!" or "Aimbot Disabled")
+    notify("Aimbot", on and "Auto-Punch Active!" or "Aimbot Disabled")
 end, "🏓")
 
 makeToggle("Auto-Follow Badminton (Tracks Ball Path)", false, function(on)
@@ -811,7 +898,6 @@ makeToggle("Auto-Follow Badminton (Tracks Ball Path)", false, function(on)
     notify("Follow", on and "Tracking ball landing path!" or "Follow Off")
 end, "🏃")
 
--- 4. Invisibility & Racket Unlocker
 makeToggle("Invisibility (Ghost / No One Sees You)", false, function(on)
     toggleInvisibility(on)
 end, "👻")
@@ -827,7 +913,6 @@ unlockBtn.Parent = scrollList
 Instance.new("UICorner", unlockBtn).CornerRadius = UDim.new(0, 6)
 unlockBtn.MouseButton1Click:Connect(unlockAllRackets)
 
--- 5. Movement Multipliers
 makeToggle("Jump High 5x (Smash Counter)", false, function(on)
     jumpHighEnabled = on
     updateJumpStats()
@@ -838,7 +923,6 @@ makeToggle("Infinite Jump (Air Counter)", false, function(on)
     setInfJump(on)
 end, "🦘")
 
--- 6. Badminton Scanner & Optimizer
 makeToggle("Scan Badminton (Highlight Caught Only)", true, function(on)
     scanEnabled = on
     notify("ESP", on and "Color ESP Active for Birdie!" or "Scanner Off")
