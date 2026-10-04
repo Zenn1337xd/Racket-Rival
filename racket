@@ -1,7 +1,7 @@
 -- =======================================================
--- Racket Rival Hub By kevan (v2 - True Follow & Auto-Punch)
+-- Racket Rival Hub By kevan (v3 - Master Edition)
 -- Owned by kevan#9999
--- Auto Follow Badminton + Auto Punch + Aimbot + Color ESP
+-- Aggressive Aimbot/Auto-Punch + Racket Unlocker + FE Invisibility
 -- =======================================================
 
 local Players = game:GetService("Players")
@@ -38,28 +38,27 @@ local function notify(title, text)
     end)
 end
 
-notify("Racket Rival Hub", "Auto-Follow & Auto-Punch Loaded!")
+notify("Racket Rival Hub", "Loaded Master Edition By kevan!")
 
 -- =======================================================
--- THEME CONFIGURATION
+-- THEME PALETTE
 -- =======================================================
 local THEME = {
-    Bg       = Color3.fromRGB(15, 16, 22),
-    Sidebar  = Color3.fromRGB(21, 23, 31),
-    Card     = Color3.fromRGB(26, 28, 38),
-    Accent   = Color3.fromRGB(235, 45, 55),
-    BallNeon = Color3.fromRGB(0, 255, 200),
-    Text     = Color3.fromRGB(245, 245, 250),
-    SubText  = Color3.fromRGB(150, 155, 170),
-    ToggleOff= Color3.fromRGB(38, 41, 54),
-    ToggleOn = Color3.fromRGB(235, 45, 55)
+    Bg        = Color3.fromRGB(15, 16, 22),
+    Sidebar   = Color3.fromRGB(21, 23, 31),
+    Card      = Color3.fromRGB(26, 28, 38),
+    Accent    = Color3.fromRGB(235, 45, 55),
+    BallNeon  = Color3.fromRGB(0, 255, 200),
+    Text      = Color3.fromRGB(245, 245, 250),
+    SubText   = Color3.fromRGB(150, 155, 170),
+    ToggleOff = Color3.fromRGB(38, 41, 54),
+    ToggleOn  = Color3.fromRGB(235, 45, 55)
 }
 
 -- =======================================================
--- ENHANCED SHUTTLECOCK DETECTOR
+-- SHUTTLECOCK / BADMINTON TRACKER
 -- =======================================================
 local function getActiveShuttle()
-    -- 1. Scan primary projectile names
     for _, name in ipairs({"Shuttle", "Shuttlecock", "Birdie", "Badminton", "Ball"}) do
         local direct = workspace:FindFirstChild(name, true)
         if direct and direct:IsA("BasePart") and not direct:IsDescendantOf(character) then
@@ -67,7 +66,6 @@ local function getActiveShuttle()
         end
     end
 
-    -- 2. Search by model and naming patterns
     for _, obj in ipairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and not obj:IsDescendantOf(character) then
             local lName = string.lower(obj.Name)
@@ -78,10 +76,10 @@ local function getActiveShuttle()
         end
     end
 
-    -- 3. Dynamic physics search (moving unanchored projectile)
+    -- Physics velocity fallback
     for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("BasePart") and not obj.Anchored and obj.AssemblyLinearVelocity.Magnitude > 6 then
-            if obj.Size.Magnitude < 6 and not Players:GetPlayerFromCharacter(obj.Parent) then
+        if obj:IsA("BasePart") and not obj.Anchored and obj.AssemblyLinearVelocity.Magnitude > 8 then
+            if obj.Size.Magnitude < 8 and not Players:GetPlayerFromCharacter(obj.Parent) then
                 return obj
             end
         end
@@ -89,8 +87,7 @@ local function getActiveShuttle()
     return nil
 end
 
--- Locate Opponent / Enemy Court
-local function getEnemyTargetPos()
+local function getEnemyCourtPosition()
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return Vector3.zero end
 
@@ -109,51 +106,66 @@ local function getEnemyTargetPos()
     end
 
     if not targetPos then
-        targetPos = root.Position + (root.CFrame.LookVector * 60)
+        targetPos = root.Position + (root.CFrame.LookVector * 65)
     end
     return targetPos
 end
 
 -- =======================================================
--- MULTI-ACTION SWING / PUNCH ENGINE
+-- AGGRESSIVE AIMBOT & AUTO-PUNCH PIPELINE
 -- =======================================================
+local aimbotPunchEnabled = false
+local autoFollowEnabled = false
+local rushSpeed = 42
 local isPunching = false
 
-local function performPunch(enemyPos)
+local function executeAggressivePunch(shuttlePart, enemyPos)
     local root = character and character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    if not root or not shuttlePart then return end
 
-    -- 1. Aim directly towards opponent's court
-    if enemyPos then
-        root.CFrame = CFrame.new(root.Position, Vector3.new(enemyPos.X, root.Position.Y, enemyPos.Z))
+    -- 1. Hard Aim lock towards opponent
+    root.CFrame = CFrame.new(root.Position, Vector3.new(enemyPos.X, root.Position.Y, enemyPos.Z))
+
+    -- 2. Physical Hitbox Touch Injection
+    local racket = character:FindFirstChildWhichIsA("Tool") or character:FindFirstChild("Racket")
+    local hitPart = (racket and racket:FindFirstChildWhichIsA("BasePart")) or root
+    if firetouchinterest then
+        pcall(function()
+            firetouchinterest(hitPart, shuttlePart, 0)
+            task.wait(0.02)
+            firetouchinterest(hitPart, shuttlePart, 1)
+        end)
     end
 
-    -- 2. Trigger equipped racket tool
-    local tool = character:FindFirstChildWhichIsA("Tool")
-    if tool then
-        tool:Activate()
+    -- 3. Trigger equipped tool
+    if racket and racket:IsA("Tool") then
+        racket:Activate()
     end
 
-    -- 3. Trigger Game Mobile Swing Buttons (Right Side of Screen)
+    -- 4. Screen Tap Simulation (Mobile Racket Hit Button)
+    pcall(function()
+        local vp = workspace.CurrentCamera.ViewportSize
+        VirtualUser:Button1Down(Vector2.new(vp.X * 0.85, vp.Y * 0.70), workspace.CurrentCamera.CFrame)
+        task.wait(0.03)
+        VirtualUser:Button1Up(Vector2.new(vp.X * 0.85, vp.Y * 0.70), workspace.CurrentCamera.CFrame)
+    end)
+
+    -- 5. Trigger all registered mobile buttons in PlayerGui
     pcall(function()
         local pGui = player:FindFirstChild("PlayerGui")
         if pGui then
-            local screenWidth = workspace.CurrentCamera.ViewportSize.X
             for _, btn in ipairs(pGui:GetDescendants()) do
                 if (btn:IsA("ImageButton") or btn:IsA("TextButton")) and btn.Visible then
-                    if btn.AbsolutePosition.X > (screenWidth * 0.45) then
-                        local bName = string.lower(btn.Name)
-                        local img = string.lower(btn:IsA("ImageButton") and btn.Image or "")
-                        if string.find(bName, "hit") or string.find(bName, "swing") or string.find(bName, "shuttle")
-                           or string.find(bName, "smash") or string.find(img, "shuttle") or string.find(bName, "action") then
-                            if firesignal then
-                                firesignal(btn.Activated)
-                                firesignal(btn.MouseButton1Click)
-                                firesignal(btn.MouseButton1Down)
-                            elseif getconnections then
-                                for _, conn in ipairs(getconnections(btn.Activated)) do conn:Fire() end
-                                for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do conn:Fire() end
-                            end
+                    local bName = string.lower(btn.Name)
+                    local bImg = string.lower(btn:IsA("ImageButton") and btn.Image or "")
+                    if string.find(bName, "hit") or string.find(bName, "swing") or string.find(bName, "smash") 
+                       or string.find(bName, "strike") or string.find(bImg, "shuttle") then
+                        if firesignal then
+                            firesignal(btn.Activated)
+                            firesignal(btn.MouseButton1Click)
+                        elseif getconnections then
+                            for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
+                            for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
                         end
                     end
                 end
@@ -161,38 +173,22 @@ local function performPunch(enemyPos)
         end
     end)
 
-    -- 4. Screen Tap Simulation (Mobile Swing Area)
+    -- 6. Remote Invocation
     pcall(function()
-        local camSize = workspace.CurrentCamera.ViewportSize
-        local tapX = camSize.X * 0.85
-        local tapY = camSize.Y * 0.70
-        VirtualUser:Button1Down(Vector2.new(tapX, tapY), workspace.CurrentCamera.CFrame)
-        task.wait(0.03)
-        VirtualUser:Button1Up(Vector2.new(tapX, tapY), workspace.CurrentCamera.CFrame)
-    end)
-
-    -- 5. Fire Game Network Remotes
-    pcall(function()
-        for _, r in ipairs(ReplicatedStorage:GetDescendants()) do
-            if r:IsA("RemoteEvent") then
-                local rName = string.lower(r.Name)
+        for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
+            if rem:IsA("RemoteEvent") then
+                local rName = string.lower(rem.Name)
                 if string.find(rName, "hit") or string.find(rName, "swing") or string.find(rName, "smash") or string.find(rName, "play") then
-                    r:FireServer(enemyPos)
+                    rem:FireServer(shuttlePart, enemyPos)
                 end
             end
         end
     end)
 end
 
--- =======================================================
--- AUTO-FOLLOW & AUTO-PUNCH CONTROLLER
--- =======================================================
-local autoPunchEnabled = false
-local autoFollowEnabled = false
-local rushSpeedValue = 38
-
+-- Aimbot & Follow Loop
 RunService.Heartbeat:Connect(function()
-    if not (autoPunchEnabled or autoFollowEnabled) then return end
+    if not (aimbotPunchEnabled or autoFollowEnabled) then return end
 
     local root = character and character:FindFirstChild("HumanoidRootPart")
     local hum = character and character:FindFirstChildWhichIsA("Humanoid")
@@ -200,39 +196,144 @@ RunService.Heartbeat:Connect(function()
 
     local shuttle = getActiveShuttle()
     if shuttle and shuttle.Parent then
-        local flatDistance = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(shuttle.Position.X, 0, shuttle.Position.Z)).Magnitude
-        local totalDistance = (root.Position - shuttle.Position).Magnitude
+        local flatDist = (Vector3.new(root.Position.X, 0, root.Position.Z) - Vector3.new(shuttle.Position.X, 0, shuttle.Position.Z)).Magnitude
+        local totalDist = (root.Position - shuttle.Position).Magnitude
 
-        -- Follow / Rush towards badminton position
-        if autoFollowEnabled and flatDistance > 3.5 then
-            hum.WalkSpeed = rushSpeedValue
+        -- Follow ball trajectory
+        if autoFollowEnabled and flatDist > 3.5 then
+            hum.WalkSpeed = rushSpeed
             hum:MoveTo(Vector3.new(shuttle.Position.X, root.Position.Y, shuttle.Position.Z))
         end
 
-        -- Auto-Punch when badminton enters striking zone
-        if autoPunchEnabled and totalDistance <= 16 and not isPunching then
+        -- Auto-Punch when shuttle enters hitting range
+        if aimbotPunchEnabled and totalDist <= 18 and not isPunching then
             isPunching = true
 
-            local enemyPos = getEnemyTargetPos()
+            local enemyPos = getEnemyCourtPosition()
 
-            -- High Lob Aerial Jump Counter
+            -- Auto-Jump on high lobs
             if shuttle.Position.Y > (root.Position.Y + 4) then
                 hum:ChangeState(Enum.HumanoidStateType.Jumping)
             end
 
-            performPunch(enemyPos)
-            task.wait(0.22)
+            executeAggressivePunch(shuttle, enemyPos)
+            task.wait(0.2)
             isPunching = false
         end
     else
-        if hum.WalkSpeed == rushSpeedValue then
+        if hum.WalkSpeed == rushSpeed then
             hum.WalkSpeed = 16
         end
     end
 end)
 
 -- =======================================================
--- BADMINTON COLOR SCANNER / ESP
+-- UNLOCK ALL RACKETS (STORE & INVENTORY SPONSOR)
+-- =======================================================
+local function unlockAllRackets()
+    local unlockedCount = 0
+
+    -- 1. Scan ReplicatedStorage / Assets for Racket storage
+    for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("Tool") and (string.find(string.lower(obj.Name), "racket") or string.find(string.lower(obj.Parent.Name), "racket")) then
+            if not player.Backpack:FindFirstChild(obj.Name) and not character:FindFirstChild(obj.Name) then
+                local clone = obj:Clone()
+                clone.Parent = player.Backpack
+                unlockedCount = unlockedCount + 1
+            end
+        end
+    end
+
+    -- 2. Probe equip and inventory remotes
+    pcall(function()
+        for _, rem in ipairs(ReplicatedStorage:GetDescendants()) do
+            if rem:IsA("RemoteEvent") or rem:IsA("RemoteFunction") then
+                local rName = string.lower(rem.Name)
+                if string.find(rName, "equip") or string.find(rName, "select") or string.find(rName, "buy") or string.find(rName, "unlock") then
+                    for id = 1, 60 do
+                        if rem:IsA("RemoteEvent") then
+                            rem:FireServer(id)
+                            rem:FireServer(tostring(id))
+                        else
+                            rem:InvokeServer(id)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    notify("Rackets", "All available rackets loaded into inventory!")
+end
+
+-- =======================================================
+-- REAL FE INVISIBILITY (DESYNC GHOST ENGINE)
+-- =======================================================
+local isInvisible = false
+local invisConn = nil
+
+local function toggleInvisibility(state)
+    isInvisible = state
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    if state then
+        -- Desync local character representation from server camera/collider
+        pcall(function()
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.Transparency = 1
+                elseif part:IsA("Decal") then
+                    part.Transparency = 1
+                end
+            end
+
+            local lowerTorso = character:FindFirstChild("LowerTorso")
+            local rootJoint = lowerTorso and lowerTorso:FindFirstChild("Root")
+            if rootJoint then
+                rootJoint.C0 = CFrame.new(0, 100000, 0)
+            else
+                root.CFrame = root.CFrame * CFrame.new(0, 0.05, 0)
+            end
+        end)
+
+        invisConn = RunService.RenderStepped:Connect(function()
+            if character and character:FindFirstChildWhichIsA("Humanoid") then
+                for _, part in ipairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                        part.Transparency = 1
+                    end
+                end
+            end
+        end)
+        notify("Invisibility", "True Invisibility Activated (Desynced)!")
+    else
+        if invisConn then
+            invisConn:Disconnect()
+            invisConn = nil
+        end
+
+        pcall(function()
+            local lowerTorso = character:FindFirstChild("LowerTorso")
+            local rootJoint = lowerTorso and lowerTorso:FindFirstChild("Root")
+            if rootJoint then
+                rootJoint.C0 = CFrame.new(0, 0, 0)
+            end
+
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.Transparency = 0
+                elseif part:IsA("Decal") then
+                    part.Transparency = 0
+                end
+            end
+        end)
+        notify("Invisibility", "Invisibility Disabled.")
+    end
+end
+
+-- =======================================================
+-- BADMINTON COLOR ESP
 -- =======================================================
 local scanEnabled = true
 local currentHighlight = nil
@@ -305,7 +406,7 @@ RunService.RenderStepped:Connect(function()
 end)
 
 -- =======================================================
--- JUMP 5X & MOVEMENT STATS
+-- JUMP & MOVEMENT STATS
 -- =======================================================
 local jumpHighEnabled = false
 local infJumpEnabled = false
@@ -370,8 +471,8 @@ kStroke.Thickness = 2.2
 
 -- Main Window
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 350)
-mainFrame.Position = UDim2.new(0.5, -180, 0.35, -175)
+mainFrame.Size = UDim2.new(0, 360, 0, 390)
+mainFrame.Position = UDim2.new(0.5, -180, 0.35, -195)
 mainFrame.BackgroundColor3 = THEME.Bg
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
@@ -436,7 +537,7 @@ scrollList.Position = UDim2.new(0, 8, 0, 38)
 scrollList.BackgroundTransparency = 1
 scrollList.ScrollBarThickness = 2
 scrollList.ScrollBarImageColor3 = THEME.Accent
-scrollList.CanvasSize = UDim2.new(0, 0, 0, 340)
+scrollList.CanvasSize = UDim2.new(0, 0, 0, 380)
 scrollList.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout", scrollList)
@@ -501,40 +602,57 @@ local function makeToggle(labelText, defaultState, callback, icon)
 end
 
 -- =======================================================
--- ADD FEATURE TOGGLES
+-- ADD FEATURE BUTTONS & TOGGLES
 -- =======================================================
 
--- 1. Auto-Punch / Aimbot (Hits directly toward opponent)
-makeToggle("Auto-Punch / Aimbot (Strikes to Enemy)", false, function(on)
-    autoPunchEnabled = on
-    notify("Auto-Punch", on and "Auto-Punch Activated!" or "Auto-Punch Disabled")
+-- 1. Aggressive Aimbot (Auto-Punch to Enemy)
+makeToggle("Aimbot (Auto Punch to Enemy)", false, function(on)
+    aimbotPunchEnabled = on
+    notify("Aimbot", on and "Auto-Punch Activated!" or "Aimbot Disabled")
 end, "🏓")
 
--- 2. Auto-Follow Badminton (Runs directly under the ball)
+-- 2. Auto-Follow Badminton
 makeToggle("Auto-Follow Badminton (Tracks Ball Path)", false, function(on)
     autoFollowEnabled = on
-    notify("Auto-Follow", on and "Character now tracks shuttlecock!" or "Follow Disabled")
+    notify("Follow", on and "Tracking ball landing path!" or "Follow Off")
 end, "🏃")
 
--- 3. Jump High 5x (Smash Counter)
-makeToggle("Jump High 5x (Aerial Counter)", false, function(on)
+-- 3. Invisibility On/Off (Real Server Desync)
+makeToggle("Invisibility (Ghost / No One Sees You)", false, function(on)
+    toggleInvisibility(on)
+end, "👻")
+
+-- 4. Unlock All Rackets Button
+local unlockBtn = Instance.new("TextButton")
+unlockBtn.Size = UDim2.new(0.96, 0, 0, 38)
+unlockBtn.BackgroundColor3 = Color3.fromRGB(45, 110, 220)
+unlockBtn.Text = "🔓 Unlock All Rackets (Store & Items)"
+unlockBtn.TextColor3 = THEME.Text
+unlockBtn.Font = Enum.Font.GothamBold
+unlockBtn.TextSize = 11
+unlockBtn.Parent = scrollList
+Instance.new("UICorner", unlockBtn).CornerRadius = UDim.new(0, 6)
+unlockBtn.MouseButton1Click:Connect(unlockAllRackets)
+
+-- 5. Jump High 5x
+makeToggle("Jump High 5x (Smash Counter)", false, function(on)
     jumpHighEnabled = on
     updateJumpStats()
-    notify("Jump High", on and "5x Jump Height Active!" or "Jump reset to normal")
+    notify("Jump", on and "5x Jump Height Active!" or "Jump reset")
 end, "⚡")
 
--- 4. Infinite Jump
-makeToggle("Infinite Jump (Air Hang)", false, function(on)
+-- 6. Infinite Jump
+makeToggle("Infinite Jump (Air Counter)", false, function(on)
     setInfJump(on)
 end, "🦘")
 
--- 5. Scan Badminton ESP
-makeToggle("Scan Badminton (Color ESP)", true, function(on)
+-- 7. Scan Badminton (Color ESP)
+makeToggle("Scan Badminton (Highlight Caught Only)", true, function(on)
     scanEnabled = on
-    notify("ESP", on and "Color ESP Active!" or "ESP Off")
+    notify("ESP", on and "Color ESP Active for Birdie!" or "Scanner Off")
 end, "🏸")
 
--- 6. FPS Optimizer
+-- 8. FPS Booster
 local optBtn = Instance.new("TextButton")
 optBtn.Size = UDim2.new(0.96, 0, 0, 36)
 optBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 180)
